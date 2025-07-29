@@ -1,3 +1,6 @@
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_video.h>
 #include <cstddef>
 #include <cstring>
 #include <cstdlib>
@@ -9,7 +12,9 @@
 #define CR 1.0f/256.0f	// color ratio
 #define TIME 1.92f
 
-#include <GLFW/glfw3.h>
+#define SDL_MAIN_USE_CALLBACKS
+#include <SDL3/SDL_main.h>
+#include <SDL3/SDL.h>
 #include <GL/glu.h>
 
 #include <stdio.h>
@@ -80,7 +85,8 @@ int screen_start[]= {0,16,18,19, 1,7,12,2,3,8,10,13,14,4,15,6,20, 9,5,17,21};	//
 int screen_length[]={0, 1, 1, 1,24,4, 4,8,8,8, 4, 4, 2,8, 8,4, 4,16,7, 2, 8};	// screen length
 float screen_timer[screen_max];	// screen timer
 
-GLFWwindow* window = NULL;
+SDL_Window* window = NULL;
+SDL_GLContext glcontext = NULL;
 
 int keys[256];					// keyboard array
 int active=true;				// window active flag
@@ -1948,116 +1954,120 @@ int DrawGLScene(void) // draw scene
 	return true;
 	}
 
-void window_size_callback(GLFWwindow* window, int width, int height)
+SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
-	// no need to do anything on fullscreen
-	if (fullscreen) return;
-
-	screen_w = width;
-	screen_h = height;
-}
-
-void window_close_callback(GLFWwindow* window)
-{
-	done=true;
-}
-
-void error_callback(int error, const char* description)
-{
-    fprintf(stderr, "Error: %s\n", description);
-}
-
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-	if (action == GLFW_PRESS) {
-	switch (key) {
-		case GLFW_KEY_ESCAPE:
+	if (done) return SDL_APP_CONTINUE;
+	switch (event->type) {
+		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+		case SDL_EVENT_QUIT:
 			done=true;
 			break;
-		case GLFW_KEY_F1:
-			debug_flag=!debug_flag;
+		case SDL_EVENT_KEY_DOWN: {
+			if (event->key.repeat) break;
+
+			SDL_Keycode keyCode = event->key.key;
+
+			switch (keyCode) {
+					case SDLK_ESCAPE:
+						done=true;
+						break;
+					case SDLK_F1:
+						debug_flag=!debug_flag;
+						break;
+						#if DEBUG
+					case SDLK_F2: {
+							polygon=!polygon;
+							polygon_fillmode=(polygon)?GL_FILL:GL_LINE;
+							glPolygonMode(GL_FRONT,polygon_fillmode);
+							break;
+					}
+					case SDLK_F3: {
+							shader_flag=!shader_flag;
+							break;
+					}
+					case SDLK_F4: {
+							shader_postfx_flag=!shader_postfx_flag;
+							break;
+					}
+					case SDLK_TAB: {
+							shader_effect_flag=!shader_effect_flag;
+							break;
+					}
+					case SDLK_ENTER: {
+							timer_fps_total=0;
+							timer_fps_min=32768;
+							timer_fps_max=0;
+							frame_counter=0;
+							bar(1.0f);
+							greetings();
+							break;
+							}
+					case SDLK_F5:{
+							screen_i--;
+							if(screen_i<0) screen_i=screen_max-1;
+							screen(screen_start[screen_i]);
+							break;
+							}
+					case SDLK_F6:
+							{
+							screen_i++;
+							if(screen_i>screen_max-1) screen_i=0;
+							screen(screen_start[screen_i]);
+							break;
+							}
+					case SDLK_F7:
+							{
+							beat();
+							sync1();
+							sync2();
+							break;
+							}
+					case SDLK_F12:
+							{
+							postfx_scanline=!postfx_scanline;
+							break;
+							}
+					case SDLK_BACKSPACE:
+							{
+							dempause=!dempause;
+							break;
+							}
+						#endif
+
+					default:
+						break;
+				}
+		}
+		case SDL_EVENT_WINDOW_RESIZED: {
+			if (fullscreen) break;
+
+			SDL_WindowEvent winevent = event->window;
+			screen_w = winevent.data1;
+			screen_h = winevent.data2;
 			break;
-			#if DEBUG
-		case GLFW_KEY_F2: {
-				polygon=!polygon;
-				polygon_fillmode=(polygon)?GL_FILL:GL_LINE;
-				glPolygonMode(GL_FRONT,polygon_fillmode);
-				break;
 		}
-		case GLFW_KEY_F3: {
-				shader_flag=!shader_flag;
-				break;
-		}
-		case GLFW_KEY_F4: {
-				shader_postfx_flag=!shader_postfx_flag;
-				break;
-		}
-		case GLFW_KEY_TAB: {
-				shader_effect_flag=!shader_effect_flag;
-				break;
-		}
-		case GLFW_KEY_ENTER: {
-				timer_fps_total=0;
-				timer_fps_min=32768;
-				timer_fps_max=0;
-				frame_counter=0;
-				bar(1.0f);
-				greetings();
-				break;
-				}
-		case GLFW_KEY_F5:{
-				screen_i--;
-				if(screen_i<0) screen_i=screen_max-1;
-				screen(screen_start[screen_i]);
-				break;
-				}
-		case GLFW_KEY_F6:
-				{
-				screen_i++;
-				if(screen_i>screen_max-1) screen_i=0;
-				screen(screen_start[screen_i]);
-				break;
-				}
-		case GLFW_KEY_F7:
-				{
-				beat();
-				sync1();
-				sync2();
-				break;
-				}
-		case GLFW_KEY_F12:
-				{
-				postfx_scanline=!postfx_scanline;
-				break;
-				}
-		case GLFW_KEY_BACKSPACE:
-				{
-				dempause=!dempause;
-				break;
-				}
-			#endif
-	
-		default:
-			break;
 	}
-	}
+
+	return SDL_APP_CONTINUE;
 }
 
 void KillGLWindow(void)							// kill window
 	{
-	if (window)
-		glfwDestroyWindow(window);
+	if (glcontext)
+		SDL_GL_DestroyContext(glcontext);
 
-	glfwTerminate();
+	if (window)
+		SDL_DestroyWindow(window);
+
 	delete timer;
 	}
 
 int CreateGLWindow(const char* title)
 	{
-	GLFWmonitor* primary = glfwGetPrimaryMonitor();
-	const GLFWvidmode* mode = glfwGetVideoMode(primary);
-	int w=mode->width;
-	int h=mode->height;
+	SDL_DisplayID primary = SDL_GetPrimaryDisplay();
+	const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(primary);
+	int w=mode->w;
+	int h=mode->h;
 	screen_w=fullscreen?w:window_w;
 	screen_h=fullscreen?h:window_h;
 	timer_fps_min=32768;
@@ -2154,40 +2164,45 @@ int CreateGLWindow(const char* title)
 	debug_vtx[6]=-debug_w;
 	debug_vtx[7]=debug_h;
 
-	glfwWindowHint(GLFW_DEPTH_BITS, window_color);
-	glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
-	glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
+	int flags = SDL_WINDOW_OPENGL;
 	// create window
-	if (fullscreen)
-		window = glfwCreateWindow(w, h, title, primary, NULL);
-	else
-		window = glfwCreateWindow(screen_w, screen_h, title, NULL, NULL);
+	if (fullscreen) {
+		flags |= SDL_WINDOW_FULLSCREEN;
+	} else {
+		w = screen_w;
+		h = screen_h;
+	}
 
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-	glfwSetWindowSizeCallback(window, window_size_callback);
-	glfwSetWindowCloseCallback(window, window_close_callback);
-	glfwSetKeyCallback(window, key_callback);
+	window = SDL_CreateWindow(title, w, h, flags);
 
 	if (!window) {
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Err: %s", SDL_GetError());
 		KillGLWindow();
 		return false;
 	}
 
-	glfwMakeContextCurrent(window);
+	glcontext = SDL_GL_CreateContext(window);
+	if (!glcontext) {
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Err: %s", SDL_GetError());
+		return false;
+	}
 
 	if(!InitGL()) { KillGLWindow(); return false; }
 	return true;
 	}
-	
-// instance,previous instance,command line parameters,window show state
-int main(int argc, char *argv[])
-	{
-	glfwSetErrorCallback(error_callback);
 
-	if(!glfwInit())
-		exit(EXIT_FAILURE);
+SDL_AppResult SDL_AppIterate(void *appstate)
+{
+	// main loop
+	if (active && !DrawGLScene()) done=true; else SDL_GL_SwapWindow(window);
+	return SDL_APP_CONTINUE;
+}
+// instance,previous instance,command line parameters,window show state
+SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
+	{
+
+	if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS))
+		return SDL_APP_FAILURE;
 
 	// ask for fullscreen mode
 	#if !DEBUG
@@ -2202,21 +2217,22 @@ int main(int argc, char *argv[])
 #endif
 	#endif
 	// create openGL window
-	if(!CreateGLWindow(name)) return 0;					// quit if window not created
+	if(!CreateGLWindow(name)) return SDL_APP_FAILURE;					// quit if window not created
 	// display a first frame
 	DrawGLScene();
-	glfwSwapBuffers(window);
-	// main loop
-	while (!done)
-		{
-			if (active && !DrawGLScene()) done=true; else glfwSwapBuffers(window);
-			glfwPollEvents();
-		}
+	SDL_GL_SwapWindow(window);
+
+	return SDL_APP_CONTINUE;
+	}
+
+void SDL_AppQuit(void *appstate, SDL_AppResult result)
+{
 	// shutdown
 	#if MUSIC
 	KillAudio();
 	player.Close();
 	#endif
 	KillGLWindow();
-	return 0;
+
+	SDL_Quit();
 	}

@@ -3,7 +3,7 @@ CXX := g++
 STRIP := strip
 CXXFLAGS += -Wall -g
 TARGET = tsid
-LDFLAGS += -lglfw -lGL -lGLU
+LDFLAGS += -lSDL3 -lGL -lGLU
 SRCS := $(shell find -name '*.cpp')
 OBJS = $(SRCS:.cpp=.o)
 
